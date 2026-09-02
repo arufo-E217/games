@@ -103,7 +103,7 @@
       transition: width 0.05s linear;
     }
 
-    /* UI要素（ボタンなど） */
+    /* UI要素 */
     .btn {
       border: none;
       border-radius: 8px;
@@ -181,7 +181,7 @@
   <div class="status-area">
     <div class="status-info">
       <div>成功数: <span id="scoreText">0</span></div>
-      <div id="timeText" class="time-text">3.000sec</div>
+      <div id="timeText" class="time-text">1.000sec</div>
     </div>
     <div class="gauge-container">
       <div id="gaugeBar" class="gauge-bar"></div>
@@ -190,7 +190,7 @@
 </div>
 
 <script>
-  const LIMIT_TIME = 3.0; // 制限時間（秒）
+  const LIMIT_TIME = 1.0; // 制限時間を1秒に変更
   
   let score = 0;
   let timeLeft = LIMIT_TIME;
@@ -204,7 +204,6 @@
   const timeTextEl = document.getElementById('timeText');
   const gaugeBarEl = document.getElementById('gaugeBar');
 
-  // ミニゲームの種類一覧
   const minigames = [
     taskBigButton,
     taskOddNumber,
@@ -265,7 +264,6 @@
 
       if (timeLeft <= 0) {
         clearInterval(timerId);
-        // 「触るな」ゲームの場合は時間切れで成功
         if (currentTask === 'dont_touch') {
           success();
         } else {
@@ -280,7 +278,6 @@
     const percentage = (time / LIMIT_TIME) * 100;
     gaugeBarEl.style.width = percentage + "%";
     
-    // ゲージの色変更（残り時間が少ないと赤に）
     if (percentage < 30) {
       gaugeBarEl.style.backgroundColor = "#ff4757";
     } else {
@@ -290,7 +287,6 @@
 
   // --- ミニゲームの実装 ---
 
-  // 1. でかいボタンを押せ
   function taskBigButton() {
     currentTask = 'big_button';
     instructionEl.textContent = "早く押せ！";
@@ -303,7 +299,6 @@
     playAreaEl.appendChild(btn);
   }
 
-  // 2. 奇数を押せ (偶数3つ、奇数1つ)
   function taskOddNumber() {
     currentTask = 'odd_number';
     instructionEl.textContent = "奇数を押せ！";
@@ -326,7 +321,6 @@
     renderGridButtons(numbers);
   }
 
-  // 3. 偶数を押せ (奇数3つ、偶数1つ)
   function taskEvenNumber() {
     currentTask = 'even_number';
     instructionEl.textContent = "偶数を押せ！";
@@ -349,7 +343,6 @@
     renderGridButtons(numbers);
   }
 
-  // 4. 触るな
   function taskDontTouch() {
     currentTask = 'dont_touch';
     instructionEl.textContent = "触るな！";
@@ -363,7 +356,6 @@
     playAreaEl.appendChild(btn);
   }
 
-  // 5. 指定の色を押せ
   function taskColorButton() {
     currentTask = 'color_button';
     
@@ -399,7 +391,6 @@
     playAreaEl.appendChild(grid);
   }
 
-  // 数字グリッドの描画用共通関数
   function renderGridButtons(items) {
     const grid = document.createElement('div');
     grid.className = 'grid-4';
