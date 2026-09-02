@@ -154,14 +154,24 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 20px;
+      gap: 15px;
+      width: 100%;
     }
 
-    .start-btn {
-      padding: 12px 30px;
+    .mode-btn {
+      width: 80%;
+      padding: 15px;
       font-size: 20px;
+    }
+
+    .btn-easy {
       background-color: #2ed573;
       color: #000;
+    }
+
+    .btn-hard {
+      background-color: #ff4757;
+      color: #fff;
     }
   </style>
 </head>
@@ -169,19 +179,20 @@
 
 <div class="game-container">
   <div class="instruction-area">
-    <div id="instruction" class="instruction-text">高速ミニゲーミング</div>
+    <div id="instruction" class="instruction-text">モードを選択</div>
   </div>
   
   <div id="playArea" class="play-area">
     <div id="screenContent" class="start-screen">
-      <button class="btn start-btn" onclick="startGame()">スタート</button>
+      <button class="btn mode-btn btn-easy" onclick="startGame(2.0)">かんたん (2秒)</button>
+      <button class="btn mode-btn btn-hard" onclick="startGame(1.0)">むずかしい (1秒)</button>
     </div>
   </div>
   
   <div class="status-area">
     <div class="status-info">
       <div>成功数: <span id="scoreText">0</span></div>
-      <div id="timeText" class="time-text">1.000sec</div>
+      <div id="timeText" class="time-text">0.000sec</div>
     </div>
     <div class="gauge-container">
       <div id="gaugeBar" class="gauge-bar"></div>
@@ -190,10 +201,9 @@
 </div>
 
 <script>
-  const LIMIT_TIME = 1.0; // 制限時間を1秒に変更
-  
+  let limitTime = 2.0; // 選択された制限時間
   let score = 0;
-  let timeLeft = LIMIT_TIME;
+  let timeLeft = limitTime;
   let timerId = null;
   let currentTask = null;
   let isPlaying = false;
@@ -212,7 +222,19 @@
     taskColorButton
   ];
 
-  function startGame() {
+  function showStartScreen() {
+    instructionEl.textContent = "モードを選択";
+    playAreaEl.innerHTML = `
+      <div class="start-screen">
+        <button class="btn mode-btn btn-easy" onclick="startGame(2.0)">かんたん (2秒)</button>
+        <button class="btn mode-btn btn-hard" onclick="startGame(1.0)">むずかしい (1秒)</button>
+      </div>
+    `;
+    updateTimerDisplay(0);
+  }
+
+  function startGame(selectedTime) {
+    limitTime = selectedTime;
     score = 0;
     isPlaying = true;
     scoreTextEl.textContent = score;
@@ -228,7 +250,7 @@
       <div class="gameover-screen">
         <p style="font-size: 18px; color: #ff6b6b;">${reason}</p>
         <p style="font-size: 22px;">記録: ${score} 回成功</p>
-        <button class="btn start-btn" onclick="startGame()">もう一度</button>
+        <button class="btn mode-btn btn-easy" onclick="showStartScreen()">タイトルへ</button>
       </div>
     `;
     updateTimerDisplay(0);
@@ -250,7 +272,7 @@
 
   function startTimer() {
     clearInterval(timerId);
-    timeLeft = LIMIT_TIME;
+    timeLeft = limitTime;
     updateTimerDisplay(timeLeft);
 
     const startTime = Date.now();
@@ -259,7 +281,7 @@
       if (!isPlaying) return;
       
       const elapsed = (Date.now() - startTime) / 1000;
-      timeLeft = Math.max(0, LIMIT_TIME - elapsed);
+      timeLeft = Math.max(0, limitTime - elapsed);
       updateTimerDisplay(timeLeft);
 
       if (timeLeft <= 0) {
@@ -275,7 +297,7 @@
 
   function updateTimerDisplay(time) {
     timeTextEl.textContent = time.toFixed(3) + "sec";
-    const percentage = (time / LIMIT_TIME) * 100;
+    const percentage = limitTime > 0 ? (time / limitTime) * 100 : 0;
     gaugeBarEl.style.width = percentage + "%";
     
     if (percentage < 30) {
