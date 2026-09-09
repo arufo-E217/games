@@ -2,29 +2,38 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 拡大縮小を禁止（user-scalable=no, viewport-fit=cover） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>高速ミニゲーミング</title>
   <style>
-    * {
-      box-sizing: border-box;
+    /* 画面全体の固定・スクロール防止・選択防止 */
+    html, body {
+      width: 100%;
+      height: 100%;
       margin: 0;
       padding: 0;
-      user-select: none;
-    }
-
-    body {
+      overflow: hidden; /* スクロールを禁止 */
+      position: fixed; /* iOSのバウンススクロール防止 */
+      top: 0;
+      left: 0;
       background-color: #121212;
       color: #ffffff;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
-      min-height: 100vh;
+      /* スマホでのタッチや長押しによる挙動を防止 */
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      touch-action: none; /* ピンチズームやスワイプなどのジェスチャーを無効化 */
     }
 
     .game-container {
-      width: 400px;
-      height: 600px;
+      width: 100%;
+      max-width: 400px;
+      height: 100%;
+      max-height: 600px;
       background-color: #1e1e1e;
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -43,6 +52,7 @@
       align-items: center;
       padding: 10px;
       border-bottom: 2px solid #333;
+      flex-shrink: 0;
     }
 
     .instruction-text {
@@ -61,6 +71,7 @@
       align-items: center;
       background-color: #141414;
       padding: 20px;
+      touch-action: none;
     }
 
     /* ステータスエリア */
@@ -72,6 +83,7 @@
       flex-direction: column;
       justify-content: space-between;
       border-top: 2px solid #333;
+      flex-shrink: 0;
     }
 
     .status-info {
@@ -111,6 +123,9 @@
       cursor: pointer;
       color: #fff;
       transition: transform 0.1s;
+      /* タップ時の青いハイライトを削除 */
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .btn:active {
@@ -201,7 +216,23 @@
 </div>
 
 <script>
-  let limitTime = 2.0; // 選択された制限時間
+  // ダブルタップによるズーム（拡大）を強制防止
+  document.addEventListener('touchstart', function(event) {
+    if (event.touches.length > 1) {
+      event.preventDefault(); // 多点タッチ（ピンチイン・アウト）を無効化
+    }
+  }, { passive: false });
+
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', function(event) {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+      event.preventDefault(); // ダブルタップズームを無効化
+    }
+    lastTouchEnd = now;
+  }, false);
+
+  let limitTime = 2.0;
   let score = 0;
   let timeLeft = limitTime;
   let timerId = null;
