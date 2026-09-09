@@ -109,7 +109,8 @@
       width: 100%;
       height: 100%;
       background-color: #00ffcc;
-      transition: width 0.05s linear;
+      /* アニメーションを一切排除し計算値を即時反映 */
+      transition: none; 
     }
 
     /* UI要素 */
@@ -167,6 +168,8 @@
       align-items: center;
       gap: 15px;
       width: 100%;
+      height: 100%;
+      justify-content: center;
     }
 
     .gameover-screen {
@@ -189,14 +192,10 @@
       color: #fff;
     }
 
-    .tap-counter {
+    .tap-notice {
       margin-top: 10px;
-      padding: 10px 20px;
-      background-color: #333;
-      border: 1px solid #555;
-      border-radius: 20px;
-      font-size: 16px;
-      color: #00ffcc;
+      font-size: 14px;
+      color: #888;
     }
   </style>
 </head>
@@ -226,7 +225,7 @@
 </div>
 
 <script>
-  // ブラウザのタッチ操作（ダブルタップ拡大など）を無効化
+  // ダブルタップによるズーム防止
   document.addEventListener('touchstart', function(event) {
     if (event.touches.length > 1) {
       event.preventDefault();
@@ -247,7 +246,7 @@
   let timerId = null;
   let currentTask = null;
   let isPlaying = false;
-  let gameoverTapCount = 5; // ゲームオーバー時のタップカウンター
+  let canReturnToTitle = false; // ゲームオーバー後タップ可能フラグ
 
   const instructionEl = document.getElementById('instruction');
   const playAreaEl = document.getElementById('playArea');
@@ -287,33 +286,35 @@
     clearInterval(timerId);
     instructionEl.textContent = "ゲームオーバー";
     
-    gameoverTapCount = 5;
-    renderGameOverScreen(reason);
-    updateTimerDisplay(limitTime); // 経過時間を最大値扱いとしゲージ0にする
-  }
+    // プログレスバーを強制的に0%（制限時間到達時）にする
+    updateTimerDisplay(limitTime);
 
-  function renderGameOverScreen(reason) {
+    canReturnToTitle = false;
+    
     playAreaEl.innerHTML = `
       <div class="gameover-screen" onclick="handleGameOverTap()">
         <p style="font-size: 18px; color: #ff6b6b;">${reason}</p>
         <p style="font-size: 22px;">記録: ${score} 回成功</p>
-        <div class="tap-counter">あと ${gameoverTapCount} 回タップでタイトルへ</div>
+        <div id="tapNotice" class="tap-notice">...</div>
       </div>
     `;
+
+    // 0.5秒間（500ms）タップ判定を無効化する
+    setTimeout(() => {
+      canReturnToTitle = true;
+      const noticeEl = document.getElementById('tapNotice');
+      if (noticeEl) {
+        noticeEl.style.color = '#00ffcc';
+        noticeEl.textContent = 'タップしてタイトルへ';
+      }
+    }, 500);
   }
 
   function handleGameOverTap() {
     if (isPlaying) return;
-    
-    gameoverTapCount--;
-    if (gameoverTapCount <= 0) {
-      showStartScreen();
-    } else {
-      const counterEl = playAreaEl.querySelector('.tap-counter');
-      if (counterEl) {
-        counterEl.textContent = `あと ${gameoverTapCount} 回タップでタイトルへ`;
-      }
-    }
+    if (!canReturnToTitle) return; // 0.5秒未満は無視
+
+    showStartScreen();
   }
 
   function success() {
@@ -333,6 +334,8 @@
   function startTimer() {
     clearInterval(timerId);
     const startTime = Date.now();
+    
+    // 開始時点でプログレスバーを確実に100%（0秒経過）にする
     updateTimerDisplay(0);
 
     timerId = setInterval(() => {
@@ -356,14 +359,14 @@
     const remainingTime = Math.max(0, limitTime - elapsedTime);
     timeTextEl.textContent = remainingTime.toFixed(3) + "sec";
     
-    // 指示のプログレスバー計算式: Value = 1 - (elapsedTime / limitTime)
+    // 仕様計算式: Value = 1 - (elapsedTime / limitTime)
     let value = 1 - (elapsedTime / limitTime);
-    value = Math.max(0, Math.min(1, value)); // 0 〜 1 に収める
+    value = Math.max(0, Math.min(1, value)); // 0 〜 1 に制限
     
     const percentage = value * 100;
     gaugeBarEl.style.width = percentage + "%";
     
-    // 残り時間30%未満で赤色に変化
+    // 残り30%未満で赤色に変化
     if (percentage < 30) {
       gaugeBarEl.style.backgroundColor = "#ff4757";
     } else {
