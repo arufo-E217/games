@@ -2,18 +2,16 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- 拡大縮小を禁止（user-scalable=no, viewport-fit=cover） -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>高速ミニゲーミング</title>
   <style>
-    /* 画面全体の固定・スクロール防止・選択防止 */
     html, body {
       width: 100%;
       height: 100%;
       margin: 0;
       padding: 0;
-      overflow: hidden; /* スクロールを禁止 */
-      position: fixed; /* iOSのバウンススクロール防止 */
+      overflow: hidden;
+      position: fixed;
       top: 0;
       left: 0;
       background-color: #121212;
@@ -22,11 +20,10 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      /* スマホでのタッチや長押しによる挙動を防止 */
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      touch-action: none; /* ピンチズームやスワイプなどのジェスチャーを無効化 */
+      touch-action: none;
     }
 
     .game-container {
@@ -123,7 +120,6 @@
       cursor: pointer;
       color: #fff;
       transition: transform 0.1s;
-      /* タップ時の青いハイライトを削除 */
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
@@ -173,6 +169,10 @@
       width: 100%;
     }
 
+    .gameover-screen {
+      cursor: pointer;
+    }
+
     .mode-btn {
       width: 80%;
       padding: 15px;
@@ -187,6 +187,16 @@
     .btn-hard {
       background-color: #ff4757;
       color: #fff;
+    }
+
+    .tap-counter {
+      margin-top: 10px;
+      padding: 10px 20px;
+      background-color: #333;
+      border: 1px solid #555;
+      border-radius: 20px;
+      font-size: 16px;
+      color: #00ffcc;
     }
   </style>
 </head>
@@ -216,10 +226,10 @@
 </div>
 
 <script>
-  // ダブルタップによるズーム（拡大）を強制防止
+  // ブラウザのタッチ操作（ダブルタップ拡大など）を無効化
   document.addEventListener('touchstart', function(event) {
     if (event.touches.length > 1) {
-      event.preventDefault(); // 多点タッチ（ピンチイン・アウト）を無効化
+      event.preventDefault();
     }
   }, { passive: false });
 
@@ -227,17 +237,17 @@
   document.addEventListener('touchend', function(event) {
     const now = (new Date()).getTime();
     if (now - lastTouchEnd <= 300) {
-      event.preventDefault(); // ダブルタップズームを無効化
+      event.preventDefault();
     }
     lastTouchEnd = now;
   }, false);
 
   let limitTime = 2.0;
   let score = 0;
-  let timeLeft = limitTime;
   let timerId = null;
   let currentTask = null;
   let isPlaying = false;
+  let gameoverTapCount = 5; // ゲームオーバー時のタップカウンター
 
   const instructionEl = document.getElementById('instruction');
   const playAreaEl = document.getElementById('playArea');
@@ -277,14 +287,33 @@
     clearInterval(timerId);
     instructionEl.textContent = "ゲームオーバー";
     
+    gameoverTapCount = 5;
+    renderGameOverScreen(reason);
+    updateTimerDisplay(limitTime); // 経過時間を最大値扱いとしゲージ0にする
+  }
+
+  function renderGameOverScreen(reason) {
     playAreaEl.innerHTML = `
-      <div class="gameover-screen">
+      <div class="gameover-screen" onclick="handleGameOverTap()">
         <p style="font-size: 18px; color: #ff6b6b;">${reason}</p>
         <p style="font-size: 22px;">記録: ${score} 回成功</p>
-        <button class="btn mode-btn btn-easy" onclick="showStartScreen()">タイトルへ</button>
+        <div class="tap-counter">あと ${gameoverTapCount} 回タップでタイトルへ</div>
       </div>
     `;
-    updateTimerDisplay(0);
+  }
+
+  function handleGameOverTap() {
+    if (isPlaying) return;
+    
+    gameoverTapCount--;
+    if (gameoverTapCount <= 0) {
+      showStartScreen();
+    } else {
+      const counterEl = playAreaEl.querySelector('.tap-counter');
+      if (counterEl) {
+        counterEl.textContent = `あと ${gameoverTapCount} 回タップでタイトルへ`;
+      }
+    }
   }
 
   function success() {
@@ -303,19 +332,16 @@
 
   function startTimer() {
     clearInterval(timerId);
-    timeLeft = limitTime;
-    updateTimerDisplay(timeLeft);
-
     const startTime = Date.now();
-    
+    updateTimerDisplay(0);
+
     timerId = setInterval(() => {
       if (!isPlaying) return;
       
-      const elapsed = (Date.now() - startTime) / 1000;
-      timeLeft = Math.max(0, limitTime - elapsed);
-      updateTimerDisplay(timeLeft);
+      const elapsedTime = (Date.now() - startTime) / 1000;
+      updateTimerDisplay(elapsedTime);
 
-      if (timeLeft <= 0) {
+      if (elapsedTime >= limitTime) {
         clearInterval(timerId);
         if (currentTask === 'dont_touch') {
           success();
@@ -326,11 +352,18 @@
     }, 10);
   }
 
-  function updateTimerDisplay(time) {
-    timeTextEl.textContent = time.toFixed(3) + "sec";
-    const percentage = limitTime > 0 ? (time / limitTime) * 100 : 0;
+  function updateTimerDisplay(elapsedTime) {
+    const remainingTime = Math.max(0, limitTime - elapsedTime);
+    timeTextEl.textContent = remainingTime.toFixed(3) + "sec";
+    
+    // 指示のプログレスバー計算式: Value = 1 - (elapsedTime / limitTime)
+    let value = 1 - (elapsedTime / limitTime);
+    value = Math.max(0, Math.min(1, value)); // 0 〜 1 に収める
+    
+    const percentage = value * 100;
     gaugeBarEl.style.width = percentage + "%";
     
+    // 残り時間30%未満で赤色に変化
     if (percentage < 30) {
       gaugeBarEl.style.backgroundColor = "#ff4757";
     } else {
