@@ -119,7 +119,7 @@
       font-weight: bold;
       cursor: pointer;
       color: #fff;
-      transition: transform 0.1s;
+      transition: transform 0.05s;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
@@ -155,6 +155,17 @@
       background-color: #3742fa;
     }
 
+    /* 数字用のカラーデザイン */
+    .btn-odd {
+      background-color: #ff7f50 !important; /* 奇数：オレンジ */
+      color: #fff;
+    }
+
+    .btn-even {
+      background-color: #1e90ff !important; /* 偶数：ブルー */
+      color: #fff;
+    }
+
     .color-btn {
       width: 100%;
       height: 100%;
@@ -185,24 +196,41 @@
     .compare-box {
       flex: 1;
       background-color: #222;
-      border: 2px solid #444;
-      border-radius: 8px;
+      border: 3px solid #444;
+      border-radius: 12px;
       position: relative;
       cursor: pointer;
       overflow: hidden;
+      transition: border-color 0.1s;
     }
 
     .compare-box:active {
-      border-color: #00ffcc;
+      transform: scale(0.98);
+    }
+
+    /* 多い・少ないの見た目判断用テーマ */
+    .theme-more .compare-box {
+      border-color: #ffcc00; /* 多い：ゴールド枠 */
+    }
+
+    .theme-less .compare-box {
+      border-color: #a55eea; /* 少ない：パープル枠 */
     }
 
     .dot {
       position: absolute;
-      width: 16px;
-      height: 16px;
-      background-color: #ffcc00;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       transform: translate(-50%, -50%);
+    }
+
+    .theme-more .dot {
+      background-color: #ffcc00;
+    }
+
+    .theme-less .dot {
+      background-color: #a55eea;
     }
 
     .start-screen, .gameover-screen {
@@ -269,7 +297,7 @@
 </div>
 
 <script>
-  // ブラウザのタッチ操作防止
+  // 画面のマルチタッチ（ズーム）のみ防止し、単一ボタンの高速連打を阻害しないように修正
   document.addEventListener('touchstart', function(event) {
     if (event.touches.length > 1) {
       event.preventDefault();
@@ -279,7 +307,8 @@
   let lastTouchEnd = 0;
   document.addEventListener('touchend', function(event) {
     const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) {
+    // ボタン以外の部分でのダブルタップ拡大のみを禁止
+    if (now - lastTouchEnd <= 300 && !event.target.closest('button, .compare-box')) {
       event.preventDefault();
     }
     lastTouchEnd = now;
@@ -298,7 +327,6 @@
   const timeTextEl = document.getElementById('timeText');
   const gaugeBarEl = document.getElementById('gaugeBar');
 
-  // 全ミニゲームのリスト
   const minigames = [
     taskBigButton,
     taskOddNumber,
@@ -417,7 +445,7 @@
     }
   }
 
-  // --- 既存のミニゲーム ---
+  // --- ミニゲームの実装 ---
 
   function taskBigButton() {
     currentTask = 'big_button';
@@ -431,6 +459,7 @@
     playAreaEl.appendChild(btn);
   }
 
+  // 奇数を押せ（色分け追加）
   function taskOddNumber() {
     currentTask = 'odd_number';
     instructionEl.textContent = "奇数を押せ！";
@@ -444,15 +473,16 @@
     let dummy3 = evens[Math.floor(Math.random() * evens.length)];
 
     const numbers = [
-      { val: target, isCorrect: true },
-      { val: dummy1, isCorrect: false },
-      { val: dummy2, isCorrect: false },
-      { val: dummy3, isCorrect: false }
+      { val: target, isCorrect: true, isOdd: true },
+      { val: dummy1, isCorrect: false, isOdd: false },
+      { val: dummy2, isCorrect: false, isOdd: false },
+      { val: dummy3, isCorrect: false, isOdd: false }
     ].sort(() => Math.random() - 0.5);
 
-    renderGridButtons(numbers);
+    renderGridButtons(numbers, true);
   }
 
+  // 偶数を押せ（色分け追加）
   function taskEvenNumber() {
     currentTask = 'even_number';
     instructionEl.textContent = "偶数を押せ！";
@@ -466,13 +496,13 @@
     let dummy3 = odds[Math.floor(Math.random() * odds.length)];
 
     const numbers = [
-      { val: target, isCorrect: true },
-      { val: dummy1, isCorrect: false },
-      { val: dummy2, isCorrect: false },
-      { val: dummy3, isCorrect: false }
+      { val: target, isCorrect: true, isOdd: false },
+      { val: dummy1, isCorrect: false, isOdd: true },
+      { val: dummy2, isCorrect: false, isOdd: true },
+      { val: dummy3, isCorrect: false, isOdd: true }
     ].sort(() => Math.random() - 0.5);
 
-    renderGridButtons(numbers);
+    renderGridButtons(numbers, true);
   }
 
   function taskDontTouch() {
@@ -523,9 +553,7 @@
     playAreaEl.appendChild(grid);
   }
 
-  // --- 新規追加ミニゲーム ---
-
-  // 1. 連打せよ（3回）
+  // 1. 連打せよ（高速連打対応）
   function taskRapidTap() {
     currentTask = 'rapid_tap';
     let count = 3;
@@ -536,7 +564,9 @@
     btn.style.backgroundColor = '#ff6b81';
     btn.textContent = `あと ${count} 回`;
 
-    btn.onclick = () => {
+    // タップ・クリック両方で反応するように設定
+    const handleTap = (e) => {
+      e.preventDefault();
       count--;
       if (count <= 0) {
         success();
@@ -544,6 +574,13 @@
         btn.textContent = `あと ${count} 回`;
       }
     };
+
+    btn.addEventListener('touchstart', handleTap, { passive: false });
+    btn.addEventListener('mousedown', (e) => {
+      // touchstartで処理済みの場合は重複を避ける
+      if (e.detail === 0) return;
+      handleTap(e);
+    });
 
     playAreaEl.appendChild(btn);
   }
@@ -575,11 +612,10 @@
     const handleEnd = (x, y) => {
       const diffX = x - startX;
       const diffY = y - startY;
-      const minSwipeDistance = 30; // 最小スワイプ距離
+      const minSwipeDistance = 30;
 
       if (Math.abs(diffX) < minSwipeDistance && Math.abs(diffY) < minSwipeDistance) return;
 
-      // 主なスワイプ方向を判定
       let swipeDx = 0;
       let swipeDy = 0;
 
@@ -596,7 +632,6 @@
       }
     };
 
-    // タッチ/マウス イベント処理
     area.addEventListener('touchstart', e => {
       const t = e.touches[0];
       handleStart(t.clientX, t.clientY);
@@ -613,16 +648,15 @@
     playAreaEl.appendChild(area);
   }
 
-  // 3. 仲間外れ（図形：⚫︎ ◼️ × ▲ ★ から2種）
+  // 3. 仲間外れ
   function taskOddShape() {
     currentTask = 'odd_shape';
     instructionEl.textContent = "仲間外れを押せ！";
 
     const shapes = ['⚫︎', '◼️', '×', '▲', '★'];
-    // ランダムに2種選択
     const shuffledShapes = shapes.sort(() => Math.random() - 0.5);
-    const mainShape = shuffledShapes[0]; // 3個の側
-    const oddShape = shuffledShapes[1];  // 1個（正解）の側
+    const mainShape = shuffledShapes[0];
+    const oddShape = shuffledShapes[1];
 
     const items = [
       { val: oddShape, isCorrect: true },
@@ -634,20 +668,20 @@
     renderGridButtons(items);
   }
 
-  // 4. 簡単な計算（一桁：加減乗）
+  // 4. 簡単な計算
   function taskMath() {
     currentTask = 'math';
     const ops = ['+', '-', '×'];
     const op = ops[Math.floor(Math.random() * ops.length)];
 
-    let a = Math.floor(Math.random() * 9) + 1; // 1~9
+    let a = Math.floor(Math.random() * 9) + 1;
     let b = Math.floor(Math.random() * 9) + 1;
     let answer = 0;
 
     if (op === '+') {
       answer = a + b;
     } else if (op === '-') {
-      if (a < b) [a, b] = [b, a]; // 負の数にならないように調整
+      if (a < b) [a, b] = [b, a];
       answer = a - b;
     } else if (op === '×') {
       answer = a * b;
@@ -655,7 +689,6 @@
 
     instructionEl.textContent = `${a} ${op} ${b} = ?`;
 
-    // ダミー選択肢（被らないように生成）
     const dummies = new Set();
     while (dummies.size < 3) {
       let d = answer + (Math.floor(Math.random() * 7) - 3);
@@ -673,30 +706,29 @@
     renderGridButtons(options);
   }
 
-  // 5. 多い方を押せ
+  // 5. 多い方を押せ（カラーテーマ追加）
   function taskMoreDots() {
     currentTask = 'more_dots';
     instructionEl.textContent = "ドットが「多い」方を押せ！";
     renderDotComparison(true);
   }
 
-  // 6. 少ない方を押せ
+  // 6. 少ない方を押せ（カラーテーマ追加）
   function taskLessDots() {
     currentTask = 'less_dots';
     instructionEl.textContent = "ドットが「少ない」方を押せ！";
     renderDotComparison(false);
   }
 
-  // ドット比較描画用共通関数
   function renderDotComparison(targetIsMore) {
-    let countA = Math.floor(Math.random() * 8) + 3; // 3~10個
+    let countA = Math.floor(Math.random() * 8) + 3;
     let countB = Math.floor(Math.random() * 8) + 3;
     while (countA === countB) {
       countB = Math.floor(Math.random() * 8) + 3;
     }
 
     const container = document.createElement('div');
-    container.className = 'compare-container';
+    container.className = 'compare-container ' + (targetIsMore ? 'theme-more' : 'theme-less');
 
     const boxA = createDotBox(countA);
     const boxB = createDotBox(countB);
@@ -719,7 +751,6 @@
     playAreaEl.appendChild(container);
   }
 
-  // ランダムにドットを配置した要素を作るヘルパー関数
   function createDotBox(count) {
     const box = document.createElement('div');
     box.className = 'compare-box';
@@ -727,7 +758,6 @@
     for (let i = 0; i < count; i++) {
       const dot = document.createElement('div');
       dot.className = 'dot';
-      // 枠内にランダムに配置 (15%~85%の範囲)
       const x = Math.floor(Math.random() * 70) + 15;
       const y = Math.floor(Math.random() * 70) + 15;
       dot.style.left = x + '%';
@@ -738,14 +768,19 @@
     return box;
   }
 
-  // ボタン描画用の共通ヘルパー
-  function renderGridButtons(items) {
+  function renderGridButtons(items, useOddEvenColor = false) {
     const grid = document.createElement('div');
     grid.className = 'grid-4';
 
     items.forEach(item => {
       const btn = document.createElement('button');
       btn.className = 'btn grid-btn';
+      
+      // 偶奇による色付け
+      if (useOddEvenColor && item.isOdd !== undefined) {
+        btn.classList.add(item.isOdd ? 'btn-odd' : 'btn-even');
+      }
+
       btn.textContent = item.val;
       btn.onclick = () => {
         if (item.isCorrect) {
