@@ -109,7 +109,6 @@
       width: 100%;
       height: 100%;
       background-color: #00ffcc;
-      /* アニメーションを一切排除し計算値を即時反映 */
       transition: none; 
     }
 
@@ -159,6 +158,51 @@
     .color-btn {
       width: 100%;
       height: 100%;
+    }
+
+    /* スワイプエリア */
+    .swipe-area {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 80px;
+      color: #00ffcc;
+      background-color: #222;
+      border-radius: 12px;
+      border: 2px dashed #444;
+    }
+
+    /* 左右比較用UI */
+    .compare-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      gap: 15px;
+    }
+
+    .compare-box {
+      flex: 1;
+      background-color: #222;
+      border: 2px solid #444;
+      border-radius: 8px;
+      position: relative;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .compare-box:active {
+      border-color: #00ffcc;
+    }
+
+    .dot {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background-color: #ffcc00;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
     }
 
     .start-screen, .gameover-screen {
@@ -225,7 +269,7 @@
 </div>
 
 <script>
-  // ダブルタップによるズーム防止
+  // ブラウザのタッチ操作防止
   document.addEventListener('touchstart', function(event) {
     if (event.touches.length > 1) {
       event.preventDefault();
@@ -246,7 +290,7 @@
   let timerId = null;
   let currentTask = null;
   let isPlaying = false;
-  let canReturnToTitle = false; // ゲームオーバー後タップ可能フラグ
+  let canReturnToTitle = false;
 
   const instructionEl = document.getElementById('instruction');
   const playAreaEl = document.getElementById('playArea');
@@ -254,12 +298,19 @@
   const timeTextEl = document.getElementById('timeText');
   const gaugeBarEl = document.getElementById('gaugeBar');
 
+  // 全ミニゲームのリスト
   const minigames = [
     taskBigButton,
     taskOddNumber,
     taskEvenNumber,
     taskDontTouch,
-    taskColorButton
+    taskColorButton,
+    taskRapidTap,
+    taskSwipe,
+    taskOddShape,
+    taskMath,
+    taskMoreDots,
+    taskLessDots
   ];
 
   function showStartScreen() {
@@ -286,9 +337,7 @@
     clearInterval(timerId);
     instructionEl.textContent = "ゲームオーバー";
     
-    // プログレスバーを強制的に0%（制限時間到達時）にする
     updateTimerDisplay(limitTime);
-
     canReturnToTitle = false;
     
     playAreaEl.innerHTML = `
@@ -299,7 +348,6 @@
       </div>
     `;
 
-    // 0.5秒間（500ms）タップ判定を無効化する
     setTimeout(() => {
       canReturnToTitle = true;
       const noticeEl = document.getElementById('tapNotice');
@@ -312,8 +360,7 @@
 
   function handleGameOverTap() {
     if (isPlaying) return;
-    if (!canReturnToTitle) return; // 0.5秒未満は無視
-
+    if (!canReturnToTitle) return;
     showStartScreen();
   }
 
@@ -334,8 +381,6 @@
   function startTimer() {
     clearInterval(timerId);
     const startTime = Date.now();
-    
-    // 開始時点でプログレスバーを確実に100%（0秒経過）にする
     updateTimerDisplay(0);
 
     timerId = setInterval(() => {
@@ -359,14 +404,12 @@
     const remainingTime = Math.max(0, limitTime - elapsedTime);
     timeTextEl.textContent = remainingTime.toFixed(3) + "sec";
     
-    // 仕様計算式: Value = 1 - (elapsedTime / limitTime)
     let value = 1 - (elapsedTime / limitTime);
-    value = Math.max(0, Math.min(1, value)); // 0 〜 1 に制限
+    value = Math.max(0, Math.min(1, value));
     
     const percentage = value * 100;
     gaugeBarEl.style.width = percentage + "%";
     
-    // 残り30%未満で赤色に変化
     if (percentage < 30) {
       gaugeBarEl.style.backgroundColor = "#ff4757";
     } else {
@@ -374,7 +417,7 @@
     }
   }
 
-  // --- ミニゲームの実装 ---
+  // --- 既存のミニゲーム ---
 
   function taskBigButton() {
     currentTask = 'big_button';
@@ -480,6 +523,222 @@
     playAreaEl.appendChild(grid);
   }
 
+  // --- 新規追加ミニゲーム ---
+
+  // 1. 連打せよ（3回）
+  function taskRapidTap() {
+    currentTask = 'rapid_tap';
+    let count = 3;
+    instructionEl.textContent = "3回連打せよ！";
+
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-big';
+    btn.style.backgroundColor = '#ff6b81';
+    btn.textContent = `あと ${count} 回`;
+
+    btn.onclick = () => {
+      count--;
+      if (count <= 0) {
+        success();
+      } else {
+        btn.textContent = `あと ${count} 回`;
+      }
+    };
+
+    playAreaEl.appendChild(btn);
+  }
+
+  // 2. なぞり（スワイプ）
+  function taskSwipe() {
+    currentTask = 'swipe';
+    const directions = [
+      { name: '上', arrow: '↑', dx: 0, dy: -1 },
+      { name: '下', arrow: '↓', dx: 0, dy: 1 },
+      { name: '左', arrow: '←', dx: -1, dy: 0 },
+      { name: '右', arrow: '→', dx: 1, dy: 0 }
+    ];
+
+    const target = directions[Math.floor(Math.random() * directions.length)];
+    instructionEl.textContent = `「${target.arrow}」にスワイプ！`;
+
+    const area = document.createElement('div');
+    area.className = 'swipe-area';
+    area.textContent = target.arrow;
+
+    let startX = 0, startY = 0;
+
+    const handleStart = (x, y) => {
+      startX = x;
+      startY = y;
+    };
+
+    const handleEnd = (x, y) => {
+      const diffX = x - startX;
+      const diffY = y - startY;
+      const minSwipeDistance = 30; // 最小スワイプ距離
+
+      if (Math.abs(diffX) < minSwipeDistance && Math.abs(diffY) < minSwipeDistance) return;
+
+      // 主なスワイプ方向を判定
+      let swipeDx = 0;
+      let swipeDy = 0;
+
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        swipeDx = diffX > 0 ? 1 : -1;
+      } else {
+        swipeDy = diffY > 0 ? 1 : -1;
+      }
+
+      if (swipeDx === target.dx && swipeDy === target.dy) {
+        success();
+      } else {
+        gameOver("違う方向にスワイプ！");
+      }
+    };
+
+    // タッチ/マウス イベント処理
+    area.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      handleStart(t.clientX, t.clientY);
+    });
+
+    area.addEventListener('touchend', e => {
+      const t = e.changedTouches[0];
+      handleEnd(t.clientX, t.clientY);
+    });
+
+    area.addEventListener('mousedown', e => handleStart(e.clientX, e.clientY));
+    area.addEventListener('mouseup', e => handleEnd(e.clientX, e.clientY));
+
+    playAreaEl.appendChild(area);
+  }
+
+  // 3. 仲間外れ（図形：⚫︎ ◼️ × ▲ ★ から2種）
+  function taskOddShape() {
+    currentTask = 'odd_shape';
+    instructionEl.textContent = "仲間外れを押せ！";
+
+    const shapes = ['⚫︎', '◼️', '×', '▲', '★'];
+    // ランダムに2種選択
+    const shuffledShapes = shapes.sort(() => Math.random() - 0.5);
+    const mainShape = shuffledShapes[0]; // 3個の側
+    const oddShape = shuffledShapes[1];  // 1個（正解）の側
+
+    const items = [
+      { val: oddShape, isCorrect: true },
+      { val: mainShape, isCorrect: false },
+      { val: mainShape, isCorrect: false },
+      { val: mainShape, isCorrect: false }
+    ].sort(() => Math.random() - 0.5);
+
+    renderGridButtons(items);
+  }
+
+  // 4. 簡単な計算（一桁：加減乗）
+  function taskMath() {
+    currentTask = 'math';
+    const ops = ['+', '-', '×'];
+    const op = ops[Math.floor(Math.random() * ops.length)];
+
+    let a = Math.floor(Math.random() * 9) + 1; // 1~9
+    let b = Math.floor(Math.random() * 9) + 1;
+    let answer = 0;
+
+    if (op === '+') {
+      answer = a + b;
+    } else if (op === '-') {
+      if (a < b) [a, b] = [b, a]; // 負の数にならないように調整
+      answer = a - b;
+    } else if (op === '×') {
+      answer = a * b;
+    }
+
+    instructionEl.textContent = `${a} ${op} ${b} = ?`;
+
+    // ダミー選択肢（被らないように生成）
+    const dummies = new Set();
+    while (dummies.size < 3) {
+      let d = answer + (Math.floor(Math.random() * 7) - 3);
+      if (d >= 0 && d !== answer) dummies.add(d);
+    }
+
+    const dummyArr = Array.from(dummies);
+    const options = [
+      { val: answer, isCorrect: true },
+      { val: dummyArr[0], isCorrect: false },
+      { val: dummyArr[1], isCorrect: false },
+      { val: dummyArr[2], isCorrect: false }
+    ].sort(() => Math.random() - 0.5);
+
+    renderGridButtons(options);
+  }
+
+  // 5. 多い方を押せ
+  function taskMoreDots() {
+    currentTask = 'more_dots';
+    instructionEl.textContent = "ドットが「多い」方を押せ！";
+    renderDotComparison(true);
+  }
+
+  // 6. 少ない方を押せ
+  function taskLessDots() {
+    currentTask = 'less_dots';
+    instructionEl.textContent = "ドットが「少ない」方を押せ！";
+    renderDotComparison(false);
+  }
+
+  // ドット比較描画用共通関数
+  function renderDotComparison(targetIsMore) {
+    let countA = Math.floor(Math.random() * 8) + 3; // 3~10個
+    let countB = Math.floor(Math.random() * 8) + 3;
+    while (countA === countB) {
+      countB = Math.floor(Math.random() * 8) + 3;
+    }
+
+    const container = document.createElement('div');
+    container.className = 'compare-container';
+
+    const boxA = createDotBox(countA);
+    const boxB = createDotBox(countB);
+
+    const isAMore = countA > countB;
+    const isACorrect = targetIsMore ? isAMore : !isAMore;
+
+    boxA.onclick = () => {
+      if (isACorrect) success();
+      else gameOver("間違えた！");
+    };
+
+    boxB.onclick = () => {
+      if (!isACorrect) success();
+      else gameOver("間違えた！");
+    };
+
+    container.appendChild(boxA);
+    container.appendChild(boxB);
+    playAreaEl.appendChild(container);
+  }
+
+  // ランダムにドットを配置した要素を作るヘルパー関数
+  function createDotBox(count) {
+    const box = document.createElement('div');
+    box.className = 'compare-box';
+
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      // 枠内にランダムに配置 (15%~85%の範囲)
+      const x = Math.floor(Math.random() * 70) + 15;
+      const y = Math.floor(Math.random() * 70) + 15;
+      dot.style.left = x + '%';
+      dot.style.top = y + '%';
+      box.appendChild(dot);
+    }
+
+    return box;
+  }
+
+  // ボタン描画用の共通ヘルパー
   function renderGridButtons(items) {
     const grid = document.createElement('div');
     grid.className = 'grid-4';
